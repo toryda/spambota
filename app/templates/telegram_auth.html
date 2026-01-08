@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/accounts" class="btn btn-secondary" style="margin-right: 10px; text-decoration: none;">
+        ← Назад к аккаунтам
+    </a>
+</div>
+
+<div class="header">
+    <h1>📱 Подключение аккаунта</h1>
+    <p class="subtitle">Авторизация через SMS код</p>
+</div>
+
+<div class="content">
+    <div class="page-title">🔐 Telegram авторизация</div>
+
+    {% if error %}
+    <div style="background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); color: white; padding: 18px 20px; border-radius: 16px; margin-bottom: 25px; font-weight: 600; box-shadow: 0 8px 25px rgba(252, 129, 129, 0.3);">
+        ❌ {{ error }}
+    </div>
+    {% endif %}
+
+    {% if step == 'phone' %}
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 24px; padding: 40px; margin: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="dots" patternUnits="userSpaceOnUse" width="10" height="10"><circle cx="5" cy="5" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23dots)"/></svg>'); animation: float 20s ease-in-out infinite;"></div>
+        <div style="text-align: center; margin-bottom: 32px; position: relative; z-index: 1;">
+            <div style="font-size: 64px; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">📱</div>
+            <h2 style="margin: 0; font-size: 28px; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">Подключение Telegram</h2>
+            <p style="margin: 12px 0 0; color: rgba(255,255,255,0.9); font-size: 16px; font-weight: 500;">Безопасная авторизация через SMS код</p>
+        </div>
+        <form method="post" action="/telegram_auth/send_code" style="position: relative; z-index: 1;">
+            <div class="form-group">
+                <label style="display: block; color: rgba(255,255,255,0.95); font-weight: 600; font-size: 16px; margin-bottom: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                    🌍 Номер телефона (международный формат)
+                </label>
+                <input type="tel" name="phone" 
+                       style="width: 100%; padding: 20px; border: 3px solid rgba(255,255,255,0.2); border-radius: 16px; font-size: 20px; text-align: center; font-weight: 700; letter-spacing: 2px; background: rgba(255,255,255,0.95); color: #2d3748; backdrop-filter: blur(10px); transition: all 0.3s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);" 
+                       placeholder="+79991234567 или 89991234567" 
+                       title="Введите номер телефона"
+                       onfocus="this.style.borderColor='rgba(255,255,255,0.6)'; this.style.boxShadow='0 0 0 4px rgba(255,255,255,0.2), inset 0 2px 4px rgba(0,0,0,0.1)'"
+                       onblur="this.style.borderColor='rgba(255,255,255,0.2)'; this.style.boxShadow='inset 0 2px 4px rgba(0,0,0,0.1)'"
+                       required>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 12px; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                    ✅ Принимаются форматы: +79991234567, 89991234567, 79991234567<br>
+                    🌍 Международные номера: +1, +44, +49, +380 и другие
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 24px;">
+                <label style="display: block; color: rgba(255,255,255,0.95); font-weight: 600; font-size: 16px; margin-bottom: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                    🌐 Прокси (необязательно)
+                </label>
+                <input type="text" name="proxy_url" 
+                       style="width: 100%; padding: 16px; border: 3px solid rgba(255,255,255,0.2); border-radius: 16px; font-size: 16px; background: rgba(255,255,255,0.95); color: #2d3748; backdrop-filter: blur(10px); transition: all 0.3s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);" 
+                       placeholder="socks5://user:pass@host:port" 
+                       title="Введите прокси для подключения"
+                       onfocus="this.style.borderColor='rgba(255,255,255,0.6)'; this.style.boxShadow='0 0 0 4px rgba(255,255,255,0.2), inset 0 2px 4px rgba(0,0,0,0.1)'"
+                       onblur="this.style.borderColor='rgba(255,255,255,0.2)'; this.style.boxShadow='inset 0 2px 4px rgba(0,0,0,0.1)'">
+                <div style="font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 8px; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                    🔒 Формат: socks5://username:password@host:port<br>
+                    🌍 Оставьте пустым для прямого подключения
+                </div>
+            </div>
+
+            <button type="submit" style="width: 100%; padding: 20px; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; border: none; border-radius: 16px; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 8px 20px rgba(72, 187, 120, 0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.2); margin-top: 24px;" 
+                    onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 25px rgba(72, 187, 120, 0.5)'" 
+                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 8px 20px rgba(72, 187, 120, 0.4)'">
+                💬 Отправить код в Telegram
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if step == 'code' %}
+    <div class="card">
+        <h3 style="margin-bottom: 20px; color: #2d3748; font-size: 18px;">📋 Введите код из Telegram</h3>
+        <div style="background: linear-gradient(135deg, #68d391 0%, #48bb78 100%); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 6px 20px rgba(104, 211, 145, 0.3);">
+            ✅ Код отправлен в Telegram для {{ phone }}
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px;">
+            💡 <strong>Подсказка:</strong> Откройте приложение Telegram и найдите сообщение с кодом подтверждения. Код состоит из 5 цифр.
+        </div>
+        
+        <form method="post" action="/telegram_auth/verify_code">
+            <input type="hidden" name="phone" value="{{ phone }}">
+            <input type="hidden" name="proxy_url" value="{{ proxy_url or '' }}">
+            <div class="form-group">
+                <label class="form-label">🔑 Код из Telegram</label>
+                <input type="text" name="code" class="form-input" placeholder="12345" required autofocus maxlength="8" 
+                       style="text-align: center; font-size: 22px; letter-spacing: 4px;" 
+                       pattern="[0-9]{4,8}" title="Введите цифры из Telegram"
+                       oninput="
+                           // Оставляем только цифры
+                           this.value = this.value.replace(/[^0-9]/g, '');
+                           // Проверяем длину
+                           if (this.value.length > 0 && this.value.length < 4) {
+                               this.setCustomValidity('Код слишком короткий. Обычно код состоит из 5 цифр.');
+                           } else if (this.value.length > 8) {
+                               this.setCustomValidity('Код слишком длинный. Проверьте правильность ввода.');
+                           } else {
+                               this.setCustomValidity('');
+                           }
+                       "
+                       onpaste="
+                           setTimeout(() => {
+                               this.value = this.value.replace(/[^0-9]/g, '');
+                           }, 0);
+                       ">
+                <div style="font-size: 13px; color: #718096; margin-top: 8px; font-weight: 500;">
+                    ✅ Введите только цифры из сообщения в Telegram (обычно 5 цифр)<br>
+                    📱 Код можно скопировать прямо из уведомления
+                </div>
+            </div>
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);">
+                🚀 Подключить аккаунт
+            </button>
+            <a href="/telegram_auth" class="btn btn-secondary" style="margin-top: 10px; display: block; text-align: center; text-decoration: none;">
+                ← Запросить новый код
+            </a>
+        </form>
+        
+        <div style="background: rgba(102, 126, 234, 0.05); padding: 15px; border-radius: 10px; margin-top: 20px; border-left: 4px solid #667eea;">
+            <p style="color: #667eea; font-weight: 600; margin-bottom: 8px; font-size: 14px;">🔍 Если код не приходит:</p>
+            <ul style="color: #718096; font-size: 13px; margin: 0; padding-left: 20px;">
+                <li>Проверьте папку "Spam" в Telegram</li>
+                <li>Убедитесь, что номер телефона введен правильно</li>
+                <li>Попробуйте запросить новый код</li>
+                <li>Проверьте интернет-соединение</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if step == 'twofa' %}
+    <div class="card">
+        <h3 style="margin-bottom: 20px; color: #2d3748; font-size: 18px;">🔒 Двухфакторная аутентификация</h3>
+        <div style="background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 6px 20px rgba(246, 173, 85, 0.3);">
+            🔐 Требуется пароль двухфакторной аутентификации
+        </div>
+        <form method="post" action="/telegram_auth/verify_code">
+            <input type="hidden" name="phone" value="{{ phone }}">
+            <input type="hidden" name="code" value="{{ code }}">
+            <input type="hidden" name="proxy_url" value="{{ proxy_url or '' }}">
+            <div class="form-group">
+                <label class="form-label">🔑 Пароль 2FA</label>
+                <input type="password" name="twofa_password" class="form-input" placeholder="Введите пароль" required autofocus>
+                <div style="font-size: 13px; color: #718096; margin-top: 8px; font-weight: 500;">
+                    Введите пароль, который вы установили для двухфакторной аутентификации
+                </div>
+            </div>
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);">
+                🚀 Подключить аккаунт
+            </button>
+            <a href="/telegram_auth" class="btn btn-secondary" style="margin-top: 10px; display: block; text-align: center; text-decoration: none;">
+                ← Начать заново
+            </a>
+        </form>
+    </div>
+    {% endif %}
+
+    {% if step == 'success' %}
+    <div class="card">
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">🎉</div>
+            <h3 style="color: #2d3748; margin-bottom: 15px;">Аккаунт успешно подключён!</h3>
+            <div style="background: #f0f8ff; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <p><strong>👤 Имя:</strong> {{ user_info.first_name }} {{ user_info.last_name or '' }}</p>
+                <p><strong>📞 Телефон:</strong> {{ user_info.phone }}</p>
+                {% if user_info.username %}
+                <p><strong>🏷️ Username:</strong> @{{ user_info.username }}</p>
+                {% endif %}
+            </div>
+            <div style="background: linear-gradient(135deg, #68d391 0%, #48bb78 100%); color: white; padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; font-weight: 600; box-shadow: 0 6px 20px rgba(104, 211, 145, 0.3);">
+                📁 Папки с диалогами создаются автоматически...
+            </div>
+            <a href="/accounts" class="btn" style="margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                📱 Перейти к аккаунтам
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="text-align: center; margin-top: 30px; padding: 20px; background: rgba(102, 126, 234, 0.05); border-radius: 16px; border: 1px solid rgba(102, 126, 234, 0.1);">
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 10px;">🔒 Безопасное подключение</p>
+        <p style="color: #718096; font-size: 14px; line-height: 1.5;">
+            Используется официальный Telegram API. Ваши данные защищены и не передаются третьим лицам.
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Сообщения{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/" class="btn btn-secondary" style="margin-right: 10px; text-decoration: none;">
+        ← Назад к главной
+    </a>
+</div>
+
+<div class="header">
+    <h1>📝 Сообщения</h1>
+    <p class="subtitle">Создание шаблонов для рассылки</p>
+</div>
+
+<div class="content">
+    <div class="page-title">➕ Создать новый шаблон</div>
+
+    <form method="post" action="/messages/add" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label">Название шаблона</label>
+            <input type="text" name="title" class="form-input" placeholder="Например: Рекламное объявление" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Варианты сообщений</label>
+            <textarea name="variants_json" class="form-textarea" placeholder='["Привет! 👋 Как дела?", "Добрый день! 😊 Что нового?"]' required></textarea>
+            <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                JSON-массив строк. Для каждой отправки будет выбран случайный вариант
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Медиа файл (необязательно)</label>
+            <label class="file-upload">
+                <input type="file" name="media_file" accept="image/*,video/*,.pdf,.doc,.docx" onchange="previewFile(this)">
+                <div class="file-upload-icon">📎</div>
+                <div class="file-upload-text">Нажмите для выбора файла<br><small>Изображения, видео, документы</small></div>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Или укажите путь к файлу</label>
+            <input type="text" name="media_path" class="form-input" placeholder="/path/to/file.jpg">
+        </div>
+
+        <button type="submit" class="btn">💾 Сохранить шаблон</button>
+    </form>
+
+    <div style="margin-top: 40px;">
+        <div class="page-title">📋 Сохранённые шаблоны</div>
+
+        {% if messages %}
+        {% for m in messages %}
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #333;">{{ m.title }}</h3>
+                <span style="color: #666; font-size: 12px;">#{{ m.id }}</span>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                <code style="font-size: 13px; color: #666;">{{ m.variants_json }}</code>
+            </div>
+
+            {% if m.media_path %}
+            <div style="display: flex; align-items: center; gap: 8px; color: #666; font-size: 14px;">
+                <span>📎</span>
+                <span>{{ m.media_path.split('/')[-1] }}</span>
+            </div>
+            {% endif %}
+
+            <div style="color: #999; font-size: 12px; margin-top: 12px;">
+                Создано: {{ m.created_at.strftime('%d.%m.%Y %H:%M') }}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="text-align: center; color: #666; padding: 40px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+            <p>Пока нет шаблонов сообщений</p>
+            <p style="font-size: 14px; margin-top: 8px;">Создайте первый шаблон выше</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Запуск рассылки{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/" class="btn btn-secondary" style="margin-right: 10px; text-decoration: none;">
+        ← Назад к главной
+    </a>
+</div>
+
+<div class="header">
+    <h1>🚀 Управление рассылками</h1>
+    <p class="subtitle">Создание и контроль задач рассылки</p>
+</div>
+
+<div class="content">
+    <div class="page-title">➕ Создать новую рассылку</div>
+
+    <form method="post" action="/launch/create" id="jobForm" class="card" style="margin-bottom: 30px;">
+        <div class="form-group">
+            <label class="form-label">👤 Аккаунт</label>
+            <select name="account_id" class="form-input" required id="accountSelect">
+                <option value="">Выберите аккаунт</option>
+                {% for account in accounts %}
+                <option value="{{ account.id }}" data-phone="{{ account.phone }}">{{ account.title }} ({{ account.phone }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">📁 Папка с чатами</label>
+            <select name="folder_id" class="form-input" required id="folderSelect">
+                <option value="">Сначала выберите аккаунт</option>
+            </select>
+            <div id="folderInfo" style="display: none; margin-top: 10px; padding: 10px; background: #f0f8ff; border-radius: 8px;">
+                <div style="font-size: 14px; color: #3182ce; font-weight: 600;">📊 Информация о папке:</div>
+                <div id="folderChats" style="font-size: 13px; color: #666; margin-top: 5px;"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">📝 Шаблон сообщения</label>
+            <select name="template_id" class="form-input" required>
+                <option value="">Выберите шаблон</option>
+                {% for template in templates_list %}
+                <option value="{{ template.id }}">{{ template.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div class="form-group">
+                <label class="form-label">⏱️ Мин. интервал (сек)</label>
+                <input type="number" name="min_interval" class="form-input" value="20" min="1" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">⏱️ Макс. интервал (сек)</label>
+                <input type="number" name="max_interval" class="form-input" value="60" min="1" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">📊 Лимит сообщений в день</label>
+            <input type="number" name="daily_limit" class="form-input" value="100" min="1" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div class="form-group">
+                <label class="form-label">🌅 Время начала</label>
+                <input type="time" name="active_from" class="form-input" value="09:00" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">🌙 Время окончания</label>
+                <input type="time" name="active_to" class="form-input" value="22:00" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); width: 100%;">
+            🚀 Создать рассылку
+        </button>
+    </form>
+
+    <div class="page-title">📋 Активные рассылки</div>
+
+    {% if jobs %}
+    {% for job in jobs %}
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 style="margin: 0; color: #333;">
+                    Рассылка #{{ job.id }}
+                    {% if job.is_running %}
+                    <span style="color: #48bb78; font-size: 14px;">🟢 Активна</span>
+                    {% else %}
+                    <span style="color: #fc8181; font-size: 14px;">🔴 Остановлена</span>
+                    {% endif %}
+                </h3>
+                <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                    <p><strong>👤 Аккаунт:</strong> {{ job.account.title }} ({{ job.account.phone }})</p>
+                    <p><strong>📁 Папка:</strong> {{ job.folder.title }}</p>
+                    <p><strong>📝 Шаблон:</strong> {{ job.template.title }}</p>
+                    <p><strong>⏱️ Интервал:</strong> {{ job.min_interval }}-{{ job.max_interval }} сек</p>
+                    <p><strong>📊 Лимит:</strong> {{ job.daily_limit }} сообщений/день</p>
+                    <p><strong>🕐 Время работы:</strong> {{ job.active_from.strftime('%H:%M') }} - {{ job.active_to.strftime('%H:%M') }}</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                {% if job.is_running %}
+                <form method="post" action="/launch/stop/{{ job.id }}" style="display: inline;">
+                    <button type="submit" class="btn-sm" style="background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); color: white;">
+                        ⏹️ Остановить
+                    </button>
+                </form>
+                {% else %}
+                <form method="post" action="/launch/start/{{ job.id }}" style="display: inline;">
+                    <button type="submit" class="btn-sm" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">
+                        ▶️ Запустить
+                    </button>
+                </form>
+                {% endif %}
+                <form method="post" action="/launch/delete/{{ job.id }}" style="display: inline;" 
+                      onsubmit="return confirm('Удалить рассылку #{{ job.id }}?')">
+                    <button type="submit" class="btn-sm" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white;">
+                        🗑️ Удалить
+                    </button>
+                </form>
+                <button onclick="editJob({{ job.id }}, '{{ job.active_from.strftime('%H:%M') }}', '{{ job.active_to.strftime('%H:%M') }}', {{ job.min_interval }}, {{ job.max_interval }}, {{ job.daily_limit }})" 
+                        class="btn-sm" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white;">
+                    ⚙️ Изменить время
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="text-align: center; color: #666; padding: 40px 20px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">🚀</div>
+        <p>Нет созданных рассылок</p>
+        <p style="font-size: 14px; margin-top: 8px;">Создайте первую рассылку выше</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal для редактирования времени рассылки -->
+<div id="editJobModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 16px; width: 90%; max-width: 500px;">
+        <h3 style="margin-bottom: 20px;">⚙️ Изменить настройки рассылки</h3>
+
+        <form id="editJobForm" method="post">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label class="form-label">🌅 Время начала</label>
+                    <input type="time" name="active_from" id="editActiveFrom" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">🌙 Время окончания</label>
+                    <input type="time" name="active_to" id="editActiveTo" class="form-input" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label class="form-label">⏱️ Мин. интервал (сек)</label>
+                    <input type="number" name="min_interval" id="editMinInterval" class="form-input" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">⏱️ Макс. интервал (сек)</label>
+                    <input type="number" name="max_interval" id="editMaxInterval" class="form-input" min="1" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">📊 Лимит сообщений в день</label>
+                <input type="number" name="daily_limit" id="editDailyLimit" class="form-input" min="1" required>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: end;">
+                <button type="button" onclick="closeEditJobModal()" class="btn btn-secondary">Отмена</button>
+                <button type="submit" class="btn" style="background: #48bb78;">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.btn:hover, button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+input[type="time"] {
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+    appearance: none;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #2d3748;
+    cursor: pointer;
+}
+
+input[type="time"]:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+    background-color: #4299e1;
+    border-radius: 3px;
+    cursor: pointer;
+}
+</style>
+
+<script>
+document.getElementById('accountSelect').addEventListener('change', function() {
+    const accountId = this.value;
+    const folderSelect = document.getElementById('folderSelect');
+    const folderInfoDiv = document.getElementById('folderInfo');
+    const folderChatsDiv = document.getElementById('folderChats');
+
+    folderSelect.innerHTML = '<option value="">Загрузка...</option>';
+    folderInfoDiv.style.display = 'none';
+    folderChatsDiv.innerHTML = '';
+
+    if (accountId) {
+        fetch(`/api/folders/${accountId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                folderSelect.innerHTML = '<option value="">Выберите папку</option>';
+
+                if (data.error) {
+                    console.error('API Error:', data.error);
+                    folderSelect.innerHTML = '<option value="">Ошибка: ' + data.error + '</option>';
+                    return;
+                }
+
+                if (data.folders && Array.isArray(data.folders) && data.folders.length > 0) {
+                    data.folders.forEach(folder => {
+                        try {
+                            const option = document.createElement('option');
+                            option.value = folder.id;
+                            option.textContent = `${folder.title} (${folder.chat_count || 0} чатов)`;
+                            folderSelect.appendChild(option);
+                        } catch (err) {
+                            console.error('Error processing folder:', folder, err);
+                        }
+                    });
+                } else {
+                    folderSelect.innerHTML = '<option value="">Папки не найдены</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching folders:', error);
+                folderSelect.innerHTML = '<option value="">Ошибка загрузки: ' + error.message + '</option>';
+            });
+    } else {
+        folderSelect.innerHTML = '<option value="">Сначала выберите аккаунт</option>';
+    }
+});
+
+document.getElementById('folderSelect').addEventListener('change', function() {
+    const folderId = this.value;
+    const folderInfoDiv = document.getElementById('folderInfo');
+
+    if (folderId) {
+        folderInfoDiv.style.display = 'block';
+        const selectedOption = this.options[this.selectedIndex];
+        document.getElementById('folderChats').textContent = selectedOption.textContent;
+    } else {
+        folderInfoDiv.style.display = 'none';
+    }
+});
+
+function editJob(id, activeFrom, activeTo, minInterval, maxInterval, dailyLimit) {
+    try {
+        document.getElementById('editActiveFrom').value = activeFrom;
+        document.getElementById('editActiveTo').value = activeTo;
+        document.getElementById('editMinInterval').value = minInterval;
+        document.getElementById('editMaxInterval').value = maxInterval;
+        document.getElementById('editDailyLimit').value = dailyLimit;
+        document.getElementById('editJobForm').action = '/launch/update/' + id;
+        document.getElementById('editJobModal').style.display = 'block';
+    } catch (error) {
+        console.error('Ошибка при редактировании задачи:', error);
+        alert('Ошибка при открытии формы редактирования');
+    }
+}
+
+function closeEditJobModal() {
+    try {
+        document.getElementById('editJobModal').style.display = 'none';
+    } catch (error) {
+        console.error('Ошибка при закрытии модального окна:', error);
+    }
+}
+</script>
+{% endblock %}

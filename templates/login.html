@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="/" class="btn btn-secondary" style="margin-right: 10px; text-decoration: none;">
+        ← Назад к главной
+    </a>
+</div>
+
+<div class="header">
+    <h1>🔐 Вход в систему</h1>
+    <p class="subtitle">Авторизация администратора</p>
+</div>
+
+<div class="content">
+    <div class="page-title">🔑 Вход по паролю</div>
+
+    {% if error %}
+    <div style="background: linear-gradient(135deg, #fc8181 0%, #f56565 100%); color: white; padding: 18px 20px; border-radius: 16px; margin-bottom: 25px; font-weight: 600; box-shadow: 0 8px 25px rgba(252, 129, 129, 0.3);">
+        ❌ {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h3 style="margin-bottom: 20px; color: #2d3748; font-size: 18px;">Введите пароль администратора</h3>
+        <form method="post" action="/auth/login">
+            <div class="form-group">
+                <label class="form-label">🔐 Пароль</label>
+                <input type="password" name="password" class="form-input" placeholder="Введите пароль" required autofocus>
+            </div>
+            <button type="submit" class="btn">🚀 Войти</button>
+        </form>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; padding: 20px; background: rgba(102, 126, 234, 0.05); border-radius: 16px; border: 1px solid rgba(102, 126, 234, 0.1);">
+        <p style="color: #667eea; font-weight: 600; margin-bottom: 10px;">🔒 Безопасный вход</p>
+        <p style="color: #718096; font-size: 14px; line-height: 1.5;">
+            Используйте пароль администратора для доступа к панели управления.
+        </p>
+    </div>
+</div>
+{% endblock %}

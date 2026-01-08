@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "python-template"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.10.0,<3.12"
+fastapi = "^0.112.0"
+uvicorn = {extras = ["standard"], version = "^0.40.0"}
+apscheduler = "^3.11.0"
+cryptography = "^45.0.6"
+jinja2 = "^3.1.6"
+python-multipart = "^0.0.20"
+pydantic-settings = "^2.10.1"
+sqlmodel = "^0.0.24"
+alembic = "^1.16.4"
+telethon = "^1.40.0"
+psycopg2-binary = "^2.9.10"
+pydantic = "^2.12.5"
+python-socks = "^2.8.0"
+
+[tool.pyright]
+# https://github.com/microsoft/pyright/blob/main/docs/configuration.md
+useLibraryCodeForTypes = true
+exclude = [".cache"]
+
+[tool.ruff]
+# https://beta.ruff.rs/docs/configuration/
+select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
+ignore = ['W291', 'W292', 'W293']
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+[project]
+name = "telegram-poster"
+version = "0.1.0"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "jinja2",
+  "python-multipart",
+  "pydantic-settings",
+  "sqlmodel",
+  "alembic",
+  "telethon",
+  "apscheduler",
+  "cryptography",
+]
