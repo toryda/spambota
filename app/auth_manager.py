@@ -66,36 +66,60 @@ class TelegramAuthManager:
             return {}
 
         try:
-            # Парсим socks5://username:password@host:port
-            if proxy_url.startswith('socks5://'):
-                proxy_data = proxy_url.replace('socks5://', '')
-                if '@' in proxy_data:
-                    auth_part, addr_part = proxy_data.split('@')
-                    username, password = auth_part.split(':')
-                    host, port = addr_part.split(':')
+            url = proxy_url.strip()
+            proxy_type = 'socks5'
+            if url.startswith('http'):
+                proxy_type = 'http'
+            elif url.startswith('mtpro'):
+                proxy_type = 'mtproto'
+            
+            clean_url = url.split('://')[-1]
+            
+            if '@' in clean_url:
+                auth, addr = clean_url.split('@')
+                if ':' in auth:
+                    username, password = auth.split(':', 1)
+                else:
+                    username, password = auth, None
+                
+                if ':' in addr:
+                    host, port = addr.split(':', 1)
+                else:
+                    host, port = addr, (80 if proxy_type == 'http' else 1080)
+                    
+                return {
+                    'proxy': {
+                        'proxy_type': proxy_type,
+                        'addr': host,
+                        'port': int(port),
+                        'username': username,
+                        'password': password,
+                        'rdns': True
+                    }
+                }
+            else:
+                if ':' in clean_url:
+                    host, port = clean_url.split(':', 1)
                     return {
                         'proxy': {
-                            'proxy_type': 'socks5',
+                            'proxy_type': proxy_type,
                             'addr': host,
                             'port': int(port),
-                            'username': username,
-                            'password': password
+                            'rdns': True
                         }
                     }
                 else:
-                    host, port = proxy_data.split(':')
                     return {
                         'proxy': {
-                            'proxy_type': 'socks5',
-                            'addr': host,
-                            'port': int(port)
+                            'proxy_type': proxy_type,
+                            'addr': clean_url,
+                            'port': (80 if proxy_type == 'http' else 1080),
+                            'rdns': True
                         }
                     }
         except Exception as e:
             logger.error(f"⚠️ Ошибка парсинга прокси: {e}")
             return {}
-
-        return {}
 
     def _normalize_phone(self, phone: str) -> str:
         """Нормализует номер телефона"""
@@ -111,28 +135,8 @@ class TelegramAuthManager:
 
     def _parse_proxy(self, proxy_url: str) -> dict:
         """Парсит URL прокси для Telethon"""
-        if not proxy_url or not proxy_url.strip():
-            return {}
-        try:
-            parsed = urlparse(proxy_url)
-            proxy_type = parsed.scheme
-            host = parsed.hostname
-            port = parsed.port
-            username = parsed.username
-            password = parsed.password
-
-            proxy = {
-                'proxy_type': proxy_type,
-                'addr': host,
-                'port': port
-            }
-            if username and password:
-                proxy['username'] = username
-                proxy['password'] = password
-            return proxy
-        except Exception as e:
-            logger.error(f"⚠️ Ошибка парсинга прокси: {e}")
-            return {}
+        kwargs = self._proxy_kwargs(proxy_url)
+        return kwargs.get('proxy', {})
 
     async def start_login(self, phone: str, proxy_url: Optional[str] = None) -> tuple[bool, str, Optional[str]]:
         """

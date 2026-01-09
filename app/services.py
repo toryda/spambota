@@ -41,14 +41,24 @@ async def create_telegram_client(account: Account) -> TelegramClient:
                 proxy_type = 'socks5'
                 if url.startswith('http'):
                     proxy_type = 'http'
+                elif url.startswith('mtpro'):
+                    proxy_type = 'mtproto'
                 
                 # Убираем схему
                 clean_url = url.split('://')[-1]
                 
                 if '@' in clean_url:
                     auth, addr = clean_url.split('@')
-                    username, password = auth.split(':')
-                    host, port = addr.split(':')
+                    if ':' in auth:
+                        username, password = auth.split(':', 1)
+                    else:
+                        username, password = auth, None
+                    
+                    if ':' in addr:
+                        host, port = addr.split(':', 1)
+                    else:
+                        host, port = addr, (80 if proxy_type == 'http' else 1080)
+                        
                     proxy = {
                         'proxy_type': proxy_type,
                         'addr': host,
@@ -58,14 +68,22 @@ async def create_telegram_client(account: Account) -> TelegramClient:
                         'rdns': True
                     }
                 else:
-                    host, port = clean_url.split(':')
-                    proxy = {
-                        'proxy_type': proxy_type,
-                        'addr': host,
-                        'port': int(port),
-                        'rdns': True
-                    }
-                logger.info(f"Используется прокси {proxy_type} для {account.phone}")
+                    if ':' in clean_url:
+                        host, port = clean_url.split(':', 1)
+                        proxy = {
+                            'proxy_type': proxy_type,
+                            'addr': host,
+                            'port': int(port),
+                            'rdns': True
+                        }
+                    else:
+                        proxy = {
+                            'proxy_type': proxy_type,
+                            'addr': clean_url,
+                            'port': (80 if proxy_type == 'http' else 1080),
+                            'rdns': True
+                        }
+                logger.info(f"Используется прокси {proxy_type} для {account.phone}: {proxy['addr']}:{proxy['port']}")
             except Exception as pe:
                 logger.error(f"Ошибка парсинга прокси {account.proxy_url}: {pe}")
 
