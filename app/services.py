@@ -129,6 +129,16 @@ async def get_dialogs_from_telegram(account: Account) -> list:
             chat_id = dialog.entity.id
             username = getattr(dialog.entity, 'username', None)
 
+            # Проверяем права на отправку
+            can_send = True
+            if hasattr(dialog.entity, 'left') and dialog.entity.left:
+                can_send = False
+            elif hasattr(dialog.entity, 'default_banned_rights') and dialog.entity.default_banned_rights and dialog.entity.default_banned_rights.send_messages:
+                can_send = False
+            
+            if not can_send:
+                continue
+
             # Для удобства используем username если есть, иначе ID
             identifier = f"@{username}" if username else str(chat_id)
 
@@ -227,6 +237,21 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                                 chat_id_for_api = int(f"-100{peer.channel_id}")
 
                             if entity:
+                                # Проверяем права на отправку сообщений
+                                can_send = True
+                                if hasattr(entity, 'left') and entity.left:
+                                    can_send = False
+                                elif hasattr(entity, 'default_banned_rights') and entity.default_banned_rights and entity.default_banned_rights.send_messages:
+                                    can_send = False
+                                elif hasattr(entity, 'admin_rights') and entity.admin_rights and not entity.admin_rights.post_messages:
+                                    # Для каналов проверяем права администратора на публикацию
+                                    if hasattr(entity, 'broadcast') and entity.broadcast:
+                                        can_send = False
+                                
+                                if not can_send:
+                                    logger.info(f"Пропускаем чат {getattr(entity, 'title', getattr(entity, 'first_name', 'Неизвестный'))} (нет прав на отправку)")
+                                    continue
+
                                 # Определяем идентификатор для API
                                 if hasattr(entity, 'username') and entity.username:
                                     identifier = f"@{entity.username}"
