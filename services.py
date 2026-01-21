@@ -775,19 +775,39 @@ async def send_message_job(job_id: int):
             message_text = random.choice(variants)
 
             try:
-                # Пытаемся вступить в чат если это ссылка или username
-                entity = await client.get_entity(chat_id)
+                # Пытаемся получить сущность чата
+                try:
+                    entity = await client.get_entity(chat_id)
+                except Exception as entity_err:
+                    # Если не нашли сущность по ID/username, пробуем вступить по ссылке
+                    logger.info(f"Сущность {chat_id} не найдена, пробуем вступить через Invite: {entity_err}")
+                    if isinstance(chat_id, str) and ('t.me/' in chat_id or chat_id.startswith('+')):
+                        from telethon.tl.functions.messages import ImportChatInviteRequest
+                        invite_hash = chat_id.split('/')[-1].replace('+', '')
+                        try:
+                            await client(ImportChatInviteRequest(hash=invite_hash))
+                            entity = await client.get_entity(chat_id)
+                            logger.info(f"Успешно вступили по инвайту: {chat_id}")
+                        except Exception as import_err:
+                            logger.error(f"Не удалось вступить по инвайту {chat_id}: {import_err}")
+                            raise import_err
+                    else:
+                        raise entity_err
                 
-                # Проверяем нужно ли вступать (для каналов и групп)
+                # Проверяем нужно ли вступать (для каналов и групп, если мы получили сущность но не в ней)
                 from telethon.tl.functions.channels import JoinChannelRequest
                 from telethon.tl.types import Channel, Chat
                 
                 if isinstance(entity, (Channel, Chat)):
                     try:
-                        await client(JoinChannelRequest(entity))
-                        logger.info(f"Успешно вступили в чат {chat_id}")
+                        # Проверяем участие (left=True означает что мы не там)
+                        if hasattr(entity, 'left') and entity.left:
+                            await client(JoinChannelRequest(entity))
+                            logger.info(f"Автоматически вступили в чат {chat_id}")
                     except Exception as join_err:
-                        logger.warning(f"Ошибка вступления в {chat_id} (возможно уже там): {join_err}")
+                        # Если ошибка "Already in", игнорируем
+                        if "already" not in str(join_err).lower():
+                            logger.warning(f"Попытка вступления в {chat_id}: {join_err}")
 
                 # Отправка сообщения
                 if template.media_path:
