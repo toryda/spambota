@@ -53,6 +53,8 @@ class Folder(SQLModel, table=True):
     account_id: int = Field(foreign_key="account.id")
     title: str                           # название папки
     chats_json: str                      # JSON-массив с ID чатов
+    failed_chats_json: str = Field(default="[]") # JSON-массив с ID чатов, где произошла ошибка
+    failure_reasons_json: str = Field(default="{}") # JSON-объект {chat_id: reason}
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     jobs: List["Job"] = Relationship(back_populates="folder")

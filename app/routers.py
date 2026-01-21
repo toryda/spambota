@@ -479,6 +479,60 @@ def update_folder(
             "error": f"Ошибка обновления: {str(e)}"
         })
 
+@router.post("/folders/{folder_id}/restore_chat/{chat_id}")
+async def restore_chat(
+    folder_id: int,
+    chat_id: str,
+    session: Session = Depends(get_session),
+    auth: bool = Depends(check_auth)
+):
+    folder = session.get(Folder, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    
+    chats = json.loads(folder.chats_json or "[]")
+    failed_chats = json.loads(folder.failed_chats_json or "[]")
+    reasons = json.loads(folder.failure_reasons_json or "{}")
+    
+    if chat_id in failed_chats:
+        failed_chats.remove(chat_id)
+        if chat_id not in chats:
+            chats.append(chat_id)
+        if chat_id in reasons:
+            del reasons[chat_id]
+            
+        folder.chats_json = json.dumps(chats)
+        folder.failed_chats_json = json.dumps(failed_chats)
+        folder.failure_reasons_json = json.dumps(reasons)
+        session.commit()
+        
+    return RedirectResponse(f"/folders/{folder.account_id}", status_code=303)
+
+@router.post("/folders/{folder_id}/delete_chat/{chat_id}")
+async def delete_failed_chat(
+    folder_id: int,
+    chat_id: str,
+    session: Session = Depends(get_session),
+    auth: bool = Depends(check_auth)
+):
+    folder = session.get(Folder, folder_id)
+    if not folder:
+        raise HTTPException(404, "Folder not found")
+    
+    failed_chats = json.loads(folder.failed_chats_json or "[]")
+    reasons = json.loads(folder.failure_reasons_json or "{}")
+    
+    if chat_id in failed_chats:
+        failed_chats.remove(chat_id)
+        if chat_id in reasons:
+            del reasons[chat_id]
+            
+        folder.failed_chats_json = json.dumps(failed_chats)
+        folder.failure_reasons_json = json.dumps(reasons)
+        session.commit()
+        
+    return RedirectResponse(f"/folders/{folder.account_id}", status_code=303)
+
 
 
 @router.post("/folders/{account_id}/import_from_telegram")

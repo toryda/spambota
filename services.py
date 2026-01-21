@@ -740,6 +740,107 @@ async def execute_job(job_id: int):
             session.commit()
 
 
+async def send_message_job(job_id: int):
+    """Задача по отправке сообщений"""
+    with Session(engine) as session:
+        job = session.get(Job, job_id)
+        if not job or not job.is_running:
+            return
+
+        # Проверка лимитов и времени (уже реализовано в других местах, но для надежности)
+        now = datetime.now().time()
+        if not (job.active_from <= now <= job.active_to):
+            return
+
+        account = job.account
+        folder = job.folder
+        template = job.template
+
+        try:
+            client = await create_telegram_client(account)
+            
+            chats = json.loads(folder.chats_json)
+            if not chats:
+                job.is_running = False
+                session.add(job)
+                session.commit()
+                await client.disconnect()
+                return
+
+            # Берем случайный чат
+            chat_id = random.choice(chats)
+            
+            # Выбираем вариант сообщения
+            variants = json.loads(template.variants_json)
+            message_text = random.choice(variants)
+
+            try:
+                # Пытаемся вступить в чат если это ссылка или username
+                entity = await client.get_entity(chat_id)
+                
+                # Проверяем нужно ли вступать (для каналов и групп)
+                from telethon.tl.functions.channels import JoinChannelRequest
+                from telethon.tl.types import Channel, Chat
+                
+                if isinstance(entity, (Channel, Chat)):
+                    try:
+                        await client(JoinChannelRequest(entity))
+                        logger.info(f"Успешно вступили в чат {chat_id}")
+                    except Exception as join_err:
+                        logger.warning(f"Ошибка вступления в {chat_id} (возможно уже там): {join_err}")
+
+                # Отправка сообщения
+                if template.media_path:
+                    await client.send_file(entity, template.media_path, caption=message_text)
+                else:
+                    await client.send_message(entity, message_text)
+                
+                # Логируем успех
+                log = Log(
+                    account_id=account.id,
+                    chat_id=getattr(entity, 'id', None),
+                    chat_title=getattr(entity, 'title', str(chat_id)),
+                    message=message_text[:100],
+                    status="OK"
+                )
+                session.add(log)
+                
+            except Exception as e:
+                error_reason = str(e)
+                logger.error(f"Ошибка отправки в чат {chat_id}: {error_reason}")
+                
+                # Переносим чат в неудачные
+                failed_chats = json.loads(folder.failed_chats_json or "[]")
+                failure_reasons = json.loads(folder.failure_reasons_json or "{}")
+                
+                if chat_id not in failed_chats:
+                    failed_chats.append(chat_id)
+                    failure_reasons[str(chat_id)] = error_reason
+                    
+                    # Удаляем из основного списка
+                    chats.remove(chat_id)
+                    
+                    folder.chats_json = json.dumps(chats)
+                    folder.failed_chats_json = json.dumps(failed_chats)
+                    folder.failure_reasons_json = json.dumps(failure_reasons)
+                    session.add(folder)
+                
+                log = Log(
+                    account_id=account.id,
+                    chat_id=None,
+                    chat_title=str(chat_id),
+                    message=message_text[:100],
+                    status="ERROR",
+                    error_reason=error_reason
+                )
+                session.add(log)
+
+            session.commit()
+            await client.disconnect()
+
+        except Exception as e:
+            logger.error(f"Критическая ошибка в job {job_id}: {e}")
+
 async def start_job(job_id: int):
     """Запускает задачу рассылки"""
     with Session(engine) as session:

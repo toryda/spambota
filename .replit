@@ -16,10 +16,6 @@ publicDir = "dist"
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 5173
-externalPort = 5173
-
 [agent]
 expertMode = true
 
@@ -44,5 +40,5 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
+args = "uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"
 waitForPort = 5000
