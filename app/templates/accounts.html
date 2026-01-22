@@ -45,7 +45,7 @@
             </div>
             <div class="account-actions">
                 <a href="/folders/{{ account.id }}" class="btn btn-primary" style="margin-right: 10px;">📁 Папки</a>
-                <button onclick="editProxy({{ account.id }}, '{{ account.proxy_url or '' }}')" 
+                <button onclick="editProxy('{{ account.id }}', '{{ account.proxy_url or '' }}')" 
                         class="btn" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; margin-right: 10px;">
                     🌐 Прокси
                 </button>

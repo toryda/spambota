@@ -87,7 +87,8 @@ async def create_telegram_client(account: Account) -> TelegramClient:
         await client.connect()
 
         # Проверяем, авторизован ли клиент
-        if not await client.is_user_authorized():
+        is_auth = await client.is_user_authorized()
+        if not is_auth:
             await client.disconnect()
             raise Exception(f"Аккаунт {account.phone} не авторизован. Требуется повторная авторизация.")
 

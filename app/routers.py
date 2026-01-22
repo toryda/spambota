@@ -291,6 +291,7 @@ async def add_account(
             session_file = tmp.name
 
         client = TelegramClient(session_file, api_id, api_hash)
+        await client.connect()
         await client.start(phone=phone)
 
         # Получаем строку сессии
@@ -316,6 +317,7 @@ async def add_account(
         return RedirectResponse("/accounts", status_code=303)
 
     except Exception as e:
+        logger.error(f"Error in add_account: {e}")
         return templates.TemplateResponse("accounts.html", {
             "request": request,
             "accounts": session.exec(select(Account)).all(),
