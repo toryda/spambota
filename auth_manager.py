@@ -66,36 +66,39 @@ class TelegramAuthManager:
             return {}
 
         try:
-            # Парсим socks5://username:password@host:port
-            if proxy_url.startswith('socks5://'):
-                proxy_data = proxy_url.replace('socks5://', '')
-                if '@' in proxy_data:
-                    auth_part, addr_part = proxy_data.split('@')
-                    username, password = auth_part.split(':')
-                    host, port = addr_part.split(':')
-                    return {
-                        'proxy': {
-                            'proxy_type': 'socks5',
-                            'addr': host,
-                            'port': int(port),
-                            'username': username,
-                            'password': password
-                        }
-                    }
-                else:
-                    host, port = proxy_data.split(':')
-                    return {
-                        'proxy': {
-                            'proxy_type': 'socks5',
-                            'addr': host,
-                            'port': int(port)
-                        }
-                    }
+            url = proxy_url.strip()
+            proxy_type = 'socks5'
+            if url.startswith('http://'):
+                proxy_type = 'http'
+                url = url[7:]
+            elif url.startswith('https://'):
+                proxy_type = 'http'
+                url = url[8:]
+            elif url.startswith('socks5://'):
+                proxy_type = 'socks5'
+                url = url[9:]
+            
+            if '@' in url:
+                auth, addr = url.split('@')
+                user, password = auth.split(':')
+                host, port = addr.split(':')
+            else:
+                host, port = url.split(':')
+                user, password = None, None
+            
+            return {
+                'proxy': {
+                    'proxy_type': proxy_type,
+                    'addr': host,
+                    'port': int(port),
+                    'username': user,
+                    'password': password,
+                    'rdns': True if proxy_type == 'socks5' else False
+                }
+            }
         except Exception as e:
             logger.error(f"⚠️ Ошибка парсинга прокси: {e}")
             return {}
-
-        return {}
 
     def _normalize_phone(self, phone: str) -> str:
         """Нормализует номер телефона"""

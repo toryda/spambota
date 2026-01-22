@@ -30,19 +30,47 @@ async def create_telegram_client(account: Account) -> TelegramClient:
         # Настройка прокси если есть
         proxy = None
         if account.proxy_url:
-            # Простейший парсинг прокси (socks5://user:pass@host:port)
-            proxy_parts = account.proxy_url.replace("socks5://", "").split("@")
-            if len(proxy_parts) == 2:
-                auth, addr = proxy_parts
-                user, password = auth.split(":")
-                host, port = addr.split(":")
+            try:
+                # Улучшенный парсинг прокси
+                # Поддерживаемые форматы:
+                # socks5://user:pass@host:port
+                # http://user:pass@host:port
+                # user:pass@host:port (по умолчанию socks5)
+                # host:port (по умолчанию socks5)
+                
+                url = account.proxy_url
+                proxy_type = 'socks5'
+                if url.startswith('http://'):
+                    proxy_type = 'http'
+                    url = url[7:]
+                elif url.startswith('https://'):
+                    proxy_type = 'http'
+                    url = url[8:]
+                elif url.startswith('socks5://'):
+                    proxy_type = 'socks5'
+                    url = url[9:]
+                
+                if '@' in url:
+                    auth, addr = url.split('@')
+                    user, password = auth.split(':')
+                    host, port = addr.split(':')
+                else:
+                    host, port = url.split(':')
+                    user, password = None, None
+                
                 proxy = {
-                    'proxy_type': 'socks5',
+                    'proxy_type': proxy_type,
                     'addr': host,
                     'port': int(port),
                     'username': user,
-                    'password': password
+                    'password': password,
+                    'rdns': True if proxy_type == 'socks5' else False
                 }
+                logger.info(f"Используем прокси {proxy_type} для аккаунта {account.phone}: {host}:{port}")
+            except Exception as proxy_err:
+                logger.error(f"Ошибка парсинга прокси {account.proxy_url}: {proxy_err}")
+                # Если прокси не распарсился, пробуем без него
+                proxy = None
 
         # Используем StringSession
         from telethon.sessions import StringSession

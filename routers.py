@@ -812,6 +812,23 @@ def update_job(
     session.commit()
     return RedirectResponse("/launch", status_code=303)
 
+@router.post("/accounts/{account_id}/update_proxy")
+async def update_account_proxy(
+    account_id: int,
+    proxy_url: str = Form(None),
+    session: Session = Depends(get_session),
+    auth: bool = Depends(check_auth)
+):
+    account = session.get(Account, account_id)
+    if not account:
+        raise HTTPException(404, "Account not found")
+    
+    account.proxy_url = proxy_url.strip() if proxy_url else None
+    session.add(account)
+    session.commit()
+    
+    return RedirectResponse("/accounts", status_code=303)
+
 @router.post("/accounts/{account_id}/delete")
 def delete_account(
     request: Request,
