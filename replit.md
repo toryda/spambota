@@ -35,12 +35,15 @@ Preferred communication style: Simple, everyday language.
 - Default admin credentials: username `admin`, password `admin123`
 - Session/cookie-based authentication for web interface
 
-### Task Scheduling
-- **APScheduler** (AsyncIOScheduler) manages scheduled message sending jobs
-- Jobs support configurable parameters:
-  - Random interval ranges (e.g., 20-60 seconds between messages)
-  - Daily message limits per account
-  - Active time windows (e.g., 09:00-22:00)
+### Proxy Management
+- Improved proxy parsing supporting various formats: `socks5://`, `http://`, and raw `host:port`.
+- Direct proxy configuration for existing accounts via the web interface.
+- Support for `rdns` in SOCKS5 proxies for better Telegram compatibility.
+
+### Chat Automation
+- Automatic joining of public channels and groups.
+- Intelligent handling of private invite links (`t.me/joinchat/` or `t.me/+`).
+- Failed chats are moved to a separate section with descriptive error reasons, preventing folder data loss.
 
 ### Application Structure
 ```
