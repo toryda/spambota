@@ -32,13 +32,14 @@ async def create_telegram_client(account: Account) -> TelegramClient:
         if account.proxy_url:
             try:
                 # Улучшенный парсинг прокси
+                url = account.proxy_url.strip()
+                
                 # Поддерживаемые форматы:
                 # socks5://user:pass@host:port
                 # http://user:pass@host:port
                 # user:pass@host:port (по умолчанию socks5)
                 # host:port (по умолчанию socks5)
                 
-                url = account.proxy_url
                 proxy_type = 'socks5'
                 if url.startswith('http://'):
                     proxy_type = 'http'
@@ -49,13 +50,26 @@ async def create_telegram_client(account: Account) -> TelegramClient:
                 elif url.startswith('socks5://'):
                     proxy_type = 'socks5'
                     url = url[9:]
+                elif url.startswith('socks4://'):
+                    proxy_type = 'socks4'
+                    url = url[9:]
                 
                 if '@' in url:
-                    auth, addr = url.split('@')
-                    user, password = auth.split(':')
-                    host, port = addr.split(':')
+                    auth, addr = url.split('@', 1)
+                    if ':' in auth:
+                        user, password = auth.split(':', 1)
+                    else:
+                        user, password = auth, None
+                    
+                    if ':' in addr:
+                        host, port = addr.split(':', 1)
+                    else:
+                        host, port = addr, 1080
                 else:
-                    host, port = url.split(':')
+                    if ':' in url:
+                        host, port = url.split(':', 1)
+                    else:
+                        host, port = url, 1080
                     user, password = None, None
                 
                 proxy = {
@@ -64,12 +78,11 @@ async def create_telegram_client(account: Account) -> TelegramClient:
                     'port': int(port),
                     'username': user,
                     'password': password,
-                    'rdns': True if proxy_type == 'socks5' else False
+                    'rdns': True if proxy_type.startswith('socks') else False
                 }
                 logger.info(f"Используем прокси {proxy_type} для аккаунта {account.phone}: {host}:{port}")
             except Exception as proxy_err:
                 logger.error(f"Ошибка парсинга прокси {account.proxy_url}: {proxy_err}")
-                # Если прокси не распарсился, пробуем без него
                 proxy = None
 
         # Используем StringSession
