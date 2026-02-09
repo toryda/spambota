@@ -37,45 +37,35 @@ async def create_telegram_client(account: Account) -> TelegramClient:
                 # Поддерживаемые форматы:
                 # socks5://user:pass@host:port
                 # http://user:pass@host:port
-                # user:pass@host:port (по умолчанию socks5)
-                # host:port (по умолчанию socks5)
+                # user:pass@host:port
+                # host:port
                 
                 proxy_type = 'socks5'
-                if url.startswith('http://'):
-                    proxy_type = 'http'
-                    url = url[7:]
-                elif url.startswith('https://'):
-                    proxy_type = 'http'
-                    url = url[8:]
-                elif url.startswith('socks5://'):
-                    proxy_type = 'socks5'
-                    url = url[9:]
-                elif url.startswith('socks4://'):
-                    proxy_type = 'socks4'
-                    url = url[9:]
-                
+                if '://' in url:
+                    scheme, rest = url.split('://', 1)
+                    if scheme.lower() in ['http', 'https']:
+                        proxy_type = 'http'
+                    elif scheme.lower() in ['socks5', 'socks']:
+                        proxy_type = 'socks5'
+                    elif scheme.lower() == 'socks4':
+                        proxy_type = 'socks4'
+                    url = rest
+
                 if '@' in url:
                     auth, addr = url.split('@', 1)
-                    if ':' in auth:
-                        user, password = auth.split(':', 1)
-                    else:
-                        user, password = auth, None
-                    
-                    if ':' in addr:
-                        host, port = addr.split(':', 1)
-                    else:
-                        host, port = addr, 1080
+                    user = auth.split(':', 1)[0] if ':' in auth else auth
+                    password = auth.split(':', 1)[1] if ':' in auth else None
+                    host = addr.split(':', 1)[0] if ':' in addr else addr
+                    port = int(addr.split(':', 1)[1]) if ':' in addr else 1080
                 else:
-                    if ':' in url:
-                        host, port = url.split(':', 1)
-                    else:
-                        host, port = url, 1080
                     user, password = None, None
+                    host = url.split(':', 1)[0] if ':' in url else url
+                    port = int(url.split(':', 1)[1]) if ':' in url else 1080
                 
                 proxy = {
                     'proxy_type': proxy_type,
                     'addr': host,
-                    'port': int(port),
+                    'port': port,
                     'username': user,
                     'password': password,
                     'rdns': True if proxy_type.startswith('socks') else False
@@ -93,7 +83,10 @@ async def create_telegram_client(account: Account) -> TelegramClient:
             session,
             account.api_id,
             account.api_hash,
-            proxy=proxy
+            proxy=proxy,
+            connection_retries=3,
+            retry_delay=5,
+            timeout=30
         )
 
         # Подключаемся и проверяем авторизацию
