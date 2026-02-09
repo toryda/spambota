@@ -169,7 +169,7 @@ class TelegramAuthManager:
                 await client.connect()
 
             # Отправляем код через Telegram (не SMS)
-            await client.send_code_request(phone, force_sms=False)
+            result = await client.send_code_request(phone, force_sms=False)
 
             # Генерируем токен для продолжения
             token = secrets.token_urlsafe(16)
@@ -179,6 +179,9 @@ class TelegramAuthManager:
             self.pending_sessions[phone] = {
                 'token': token,
                 'client': client,
+                'phone': phone,
+                'phone_code_hash': result.phone_code_hash,
+                'proxy_url': proxy_url,
                 'created_at': datetime.now()
             }
 
@@ -221,10 +224,11 @@ class TelegramAuthManager:
         try:
             # Очищаем код от пробелов и дефисов
             clean_code = code.replace(' ', '').replace('-', '')
+            phone_code_hash = session_data.get('phone_code_hash')
 
             try:
                 # Пробуем войти с кодом
-                await client.sign_in(phone=phone, code=clean_code)
+                await client.sign_in(phone=phone, code=clean_code, phone_code_hash=phone_code_hash)
             except SessionPasswordNeededError:
                 logger.info(f"Требуется 2FA для {phone}")
                 if not twofa_password:
@@ -425,11 +429,12 @@ class TelegramAuthManager:
         try:
             # Очищаем код от пробелов и дефисов
             clean_code = code.replace(' ', '').replace('-', '')
+            phone_code_hash = session_data.get('phone_code_hash')
             logger.info(f"Попытка входа с кодом {clean_code} для {phone}")
 
             try:
                 # Пробуем войти с кодом
-                await client.sign_in(phone=phone, code=clean_code)
+                await client.sign_in(phone=phone, code=clean_code, phone_code_hash=phone_code_hash)
             except SessionPasswordNeededError:
                 logger.info(f"Требуется 2FA для {phone} (verify_code)")
                 if not twofa_password:

@@ -140,7 +140,7 @@ async def send_telegram_code(
         return templates.TemplateResponse("telegram_auth.html", {
             "request": request,
             "step": "code",
-            "phone": phone,
+            "phone": auth_manager._normalize_phone(phone),
             "proxy_url": proxy_url
         })
     else:
@@ -179,7 +179,7 @@ async def verify_telegram_code(
         logger.info(f"Попытка верификации кода для {phone}, код: {code[:2]}*** (длина: {len(code)})")
         
         # Верифицируем код (с возможным паролем 2FA)
-        success, message, user_info = await auth_manager.verify_code(phone, code, twofa_password)
+        success, message, user_info = await auth_manager.confirm_login(phone, code, twofa_password)
 
         if success and user_info:
             logger.info(f"✅ Успешная авторизация для {phone}")
