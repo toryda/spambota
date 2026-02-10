@@ -28,8 +28,8 @@
 
         <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
         <form method="post" action="/folders/{{ account.id }}/import_from_telegram" style="margin: 0;">
-            <button type="submit" class="btn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
-                📂 Импорт папок из Telegram
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);" onclick="return confirm('Импортировать ваши папки из Telegram?')">
+                📥 Импорт папок из Telegram
             </button>
         </form>
     </div>

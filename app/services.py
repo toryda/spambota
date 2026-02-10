@@ -225,16 +225,36 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                             entity = None
                             chat_id_for_api = None
 
-                            if isinstance(peer, InputPeerUser):
-                                entity = await client.get_entity(peer.user_id)
-                                chat_id_for_api = peer.user_id
-                            elif isinstance(peer, InputPeerChat):
-                                entity = await client.get_entity(peer.chat_id)
-                                chat_id_for_api = -peer.chat_id  # Отрицательный ID для обычных групп
-                            elif isinstance(peer, InputPeerChannel):
-                                entity = await client.get_entity(peer.channel_id)
-                                # Для каналов/супергрупп используем -100 префикс
-                                chat_id_for_api = int(f"-100{peer.channel_id}")
+                            try:
+                                if isinstance(peer, InputPeerUser):
+                                    # Пытаемся найти пользователя в локальном кэше сущностей
+                                    try:
+                                        entity = await client.get_entity(peer)
+                                    except:
+                                        entity = await client.get_entity(peer.user_id)
+                                    chat_id_for_api = peer.user_id
+                                elif isinstance(peer, InputPeerChat):
+                                    try:
+                                        entity = await client.get_entity(peer)
+                                    except:
+                                        entity = await client.get_entity(peer.chat_id)
+                                    chat_id_for_api = -peer.chat_id
+                                elif isinstance(peer, InputPeerChannel):
+                                    try:
+                                        entity = await client.get_entity(peer)
+                                    except:
+                                        entity = await client.get_entity(peer.channel_id)
+                                    chat_id_for_api = int(f"-100{peer.channel_id}")
+                            except Exception as e:
+                                logger.warning(f"Ошибка get_entity для пира {i+1}: {e}")
+                                # Если не удалось получить сущность, используем ID напрямую
+                                if isinstance(peer, InputPeerUser):
+                                    chat_identifiers.append(str(peer.user_id))
+                                elif isinstance(peer, InputPeerChat):
+                                    chat_identifiers.append(str(-peer.chat_id))
+                                elif isinstance(peer, InputPeerChannel):
+                                    chat_identifiers.append(f"-100{peer.channel_id}")
+                                continue
 
                             if entity:
                                 # Проверяем права на отправку сообщений
@@ -248,9 +268,10 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                                     if hasattr(entity, 'broadcast') and entity.broadcast:
                                         can_send = False
                                 
+                                # Мы все равно добавляем чат, даже если сейчас нет прав (может появятся)
+                                # Но логируем это для отладки
                                 if not can_send:
-                                    logger.info(f"Пропускаем чат {getattr(entity, 'title', getattr(entity, 'first_name', 'Неизвестный'))} (нет прав на отправку)")
-                                    continue
+                                    logger.info(f"Предупреждение: чат {getattr(entity, 'title', getattr(entity, 'first_name', 'Неизвестный'))} (нет прав на отправку)")
 
                                 # Определяем идентификатор для API
                                 if hasattr(entity, 'username') and entity.username:
