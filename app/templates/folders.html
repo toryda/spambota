@@ -32,6 +32,11 @@
                 📥 Импорт папок из Telegram
             </button>
         </form>
+        <form method="post" action="/folders/{{ account.id }}/import_from_telegram" style="margin: 0;">
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);" onclick="return confirm('Импортировать ваши папки из Unigram?')">
+                📤 Импорт папок из Unigram
+            </button>
+        </form>
     </div>
 
         
