@@ -67,6 +67,29 @@ class TelegramAuthManager:
 
         try:
             url = proxy_url.strip()
+            # Если это ссылка вида t.me/socks?server=...
+            if "t.me/socks" in url or "t.me/proxy" in url:
+                from urllib.parse import parse_qs
+                parsed = urlparse(url)
+                params = parse_qs(parsed.query)
+                
+                server = params.get('server', [None])[0]
+                port = params.get('port', [None])[0]
+                user = params.get('user', [None])[0]
+                pass_w = params.get('pass', [None])[0]
+                
+                if server and port:
+                    return {
+                        'proxy': {
+                            'proxy_type': 'socks5',
+                            'addr': server,
+                            'port': int(port),
+                            'username': user,
+                            'password': pass_w,
+                            'rdns': True
+                        }
+                    }
+
             proxy_type = 'socks5'
             if url.startswith('http'):
                 proxy_type = 'http'
@@ -169,7 +192,18 @@ class TelegramAuthManager:
                 await client.connect()
 
             # Отправляем код через Telegram (не SMS)
-            result = await client.send_code_request(phone, force_sms=False)
+            try:
+                result = await client.send_code_request(phone, force_sms=False)
+            except Exception as e:
+                # Если произошла ошибка при подключении (например, из-за прокси), пробуем без него
+                if proxy_url and ("connection" in str(e).lower() or "proxy" in str(e).lower()):
+                    logger.warning(f"Ошибка прокси при отправке кода, пробуем без прокси: {e}")
+                    await client.disconnect()
+                    client = TelegramClient(StringSession(), self.api_id, self.api_hash)
+                    await client.connect()
+                    result = await client.send_code_request(phone, force_sms=False)
+                else:
+                    raise e
 
             # Генерируем токен для продолжения
             token = secrets.token_urlsafe(16)
