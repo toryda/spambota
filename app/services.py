@@ -170,7 +170,7 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
         try:
             # Импортируем необходимые типы
             from telethon.tl.functions.messages import GetDialogFiltersRequest
-            from telethon.tl.types import DialogFilter, InputPeerUser, InputPeerChat, InputPeerChannel
+            from telethon.tl.types import DialogFilter, DialogFilterChatlist, InputPeerUser, InputPeerChat, InputPeerChannel
 
             # Получаем информацию о папках (dialog filters)
             result = await client(GetDialogFiltersRequest())
@@ -184,7 +184,36 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                 for filter_obj in result.filters:
                     logger.info(f"Обрабатываем фильтр: {type(filter_obj)}")
 
-                    # Проверяем, что это DialogFilter
+                    # Если это папка-чатлист (общие папки по ссылке)
+                    if isinstance(filter_obj, DialogFilterChatlist):
+                        folder_title = ""
+                        if hasattr(filter_obj, 'title'):
+                            folder_title = filter_obj.title.text if hasattr(filter_obj.title, 'text') else str(filter_obj.title)
+                        
+                        if not folder_title:
+                            folder_title = "Общая папка"
+                            
+                        logger.info(f"Обработка папки-чатлиста '{folder_title}'")
+                        chat_identifiers = []
+                        
+                        if hasattr(filter_obj, 'include_peers'):
+                            for i, peer in enumerate(filter_obj.include_peers):
+                                try:
+                                    if isinstance(peer, InputPeerChannel):
+                                        chat_identifiers.append(f"-100{peer.channel_id}")
+                                    elif isinstance(peer, InputPeerChat):
+                                        chat_identifiers.append(str(-peer.chat_id))
+                                    elif isinstance(peer, InputPeerUser):
+                                        chat_identifiers.append(str(peer.user_id))
+                                except Exception as e:
+                                    logger.warning(f"Ошибка в чатлисте: {e}")
+                                    continue
+                        
+                        if chat_identifiers:
+                            folders_data[folder_title] = chat_identifiers
+                        continue
+
+                    # Если это обычная папка
                     if not isinstance(filter_obj, DialogFilter):
                         logger.info(f"Пропускаем объект типа {type(filter_obj)}")
                         continue
