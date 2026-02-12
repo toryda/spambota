@@ -194,6 +194,12 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                         logger.info("Пропускаем фильтр без названия")
                         continue
 
+                    # Получаем название папки (оно может быть объектом TextWithEntities)
+                    if hasattr(filter_obj.title, 'text'):
+                        folder_title = filter_obj.title.text
+                    else:
+                        folder_title = str(filter_obj.title)
+
                     # Исключаем стандартные папки Telegram
                     system_folders = [
                         'All Chats', 'Unread', 'Contacts', 'Non-Contacts',
@@ -201,11 +207,10 @@ async def get_folders_from_telegram(account: Account) -> Dict[str, List[str]]:
                         'Контакты', 'Не контакты', 'Группы', 'Каналы', 'Боты'
                     ]
 
-                    if filter_obj.title in system_folders:
-                        logger.info(f"Пропускаем системную папку: {filter_obj.title}")
+                    if folder_title in system_folders:
+                        logger.info(f"Пропускаем системную папку: {folder_title}")
                         continue
 
-                    folder_title = filter_obj.title
                     chat_identifiers = []
 
                     logger.info(f"Обработка пользовательской папки '{folder_title}'")
