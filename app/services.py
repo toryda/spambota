@@ -750,9 +750,26 @@ async def execute_job(job_id: int):
             return
 
         # Проверяем время активности
-        now = datetime.now().time()
-        if not (job.active_from <= now <= job.active_to):
-            logger.info(f"Job {job_id}: вне времени активности")
+        now_dt = datetime.now()
+        now_time = now_dt.time()
+        
+        # Если время начала больше времени окончания (например, 22:00 - 08:00)
+        if job.active_from <= job.active_to:
+            is_active_time = job.active_from <= now_time <= job.active_to
+        else:
+            is_active_time = now_time >= job.active_from or now_time <= job.active_to
+
+        if not is_active_time:
+            logger.info(f"Job {job_id}: вне времени активности ({job.active_from} - {job.active_to})")
+            # Перепланируем проверку через 5 минут
+            scheduler.add_job(
+                execute_job,
+                'date',
+                run_date=now_dt + timedelta(minutes=5),
+                args=[job_id],
+                id=f"job_{job_id}",
+                replace_existing=True
+            )
             return
 
         # Проверяем дневной лимит
@@ -825,25 +842,33 @@ async def execute_job(job_id: int):
             logger.info(f"Job {job_id}: отправляем сообщение в чат {chat_id}")
 
             # Отправляем сообщение
-            result = await send_message_to_chat(client, chat_id, message, template.media_path)
+            try:
+                result = await send_message_to_chat(client, chat_id, message, template.media_path)
+            except Exception as send_err:
+                logger.error(f"Job {job_id}: ошибка при вызове send_message_to_chat: {send_err}")
+                result = None
 
             # Логируем результат
             if result:
                 log = Log(
                     account_id=account.id,
+                    job_id=job.id, # Добавляем связь с задачей если она есть в модели
                     chat_id=str(chat_id),
                     message=message[:100] + "..." if len(message) > 100 else message,
                     status="OK",
-                    error_reason=None
+                    error_reason=None,
+                    created_at=datetime.now()
                 )
                 logger.info(f"Job {job_id}: сообщение успешно отправлено в чат {chat_id}")
             else:
                 log = Log(
                     account_id=account.id,
+                    job_id=job.id,
                     chat_id=str(chat_id),
                     message=message[:100] + "..." if len(message) > 100 else message,
                     status="ERROR",
-                    error_reason=f"Не удалось отправить сообщение в чат {chat_id}. Возможно, чат не найден или нет доступа."
+                    error_reason=f"Не удалось отправить сообщение в чат {chat_id}. Возможно, чат не найден или нет доступа.",
+                    created_at=datetime.now()
                 )
                 logger.error(f"Job {job_id}: не удалось отправить сообщение в чат {chat_id}")
             
@@ -883,17 +908,16 @@ async def start_job(job_id: int):
             return
 
         # Добавляем задачу в планировщик
-        interval = random.randint(job.min_interval, job.max_interval)
         scheduler.add_job(
             execute_job,
             'date',
-            run_date=datetime.now() + timedelta(seconds=interval),
+            run_date=datetime.now(),
             args=[job_id],
             id=f"job_{job_id}",
             replace_existing=True
         )
 
-        logger.info(f"Запущена задача {job_id}, первое выполнение через {interval} сек")
+        logger.info(f"Запущена задача {job_id}, немедленный старт")
 
 
 async def stop_job(job_id: int):
