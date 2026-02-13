@@ -9,11 +9,40 @@ from app.db import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Инициализация при старте
-    print("🚀 Инициализация базы данных...")
+    from app.db import init_db
+    from app.services import scheduler, start_job, engine
+    from app.db import Job
+    from sqlmodel import Session, select
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    logger.info("🚀 Инициализация базы данных...")
     init_db()
-    print("✅ База данных готова!")
+    logger.info("✅ База данных готова!")
+    
+    # Запуск планировщика
+    if not scheduler.running:
+        scheduler.start()
+        logger.info("⏰ Планировщик запущен")
+    
+    # Перезапуск активных задач
+    try:
+        with Session(engine) as session:
+            active_jobs = session.exec(select(Job).where(Job.is_running == True)).all()
+            for job in active_jobs:
+                logger.info(f"🔄 Перезапуск активной задачи {job.id}...")
+                await start_job(job.id)
+    except Exception as e:
+        logger.error(f"❌ Ошибка перезапуска задач: {e}")
+        
     yield
-    print("🛑 Остановка приложения")
+    
+    from app.services import cleanup_clients
+    if scheduler.running:
+        scheduler.shutdown()
+    cleanup_clients()
+    logger.info("🛑 Остановка приложения")
 
 app = FastAPI(
     title="Telegram Poster",

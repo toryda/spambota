@@ -744,6 +744,11 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
 
 async def execute_job(job_id: int):
     """Выполняет одну итерацию задачи рассылки"""
+    # Проверяем, запущен ли планировщик
+    if not scheduler.running:
+        logger.warning("Планировщик не запущен, запускаем...")
+        scheduler.start()
+
     with Session(engine) as session:
         job = session.get(Job, job_id)
         if not job or not job.is_running:
@@ -773,17 +778,22 @@ async def execute_job(job_id: int):
             return
 
         # Проверяем дневной лимит
-        today_logs = session.exec(
-            select(Log).where(
-                Log.account_id == job.account_id,
-                Log.created_at >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                Log.status == "OK"
-            )
-        ).all()
-
-        if len(today_logs) >= job.daily_limit:
-            logger.info(f"Job {job_id}: достигнут дневной лимит")
-            return
+        try:
+            from sqlalchemy import func
+            count = session.exec(
+                select(func.count(Log.id)).where(
+                    Log.account_id == job.account_id,
+                    Log.created_at >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+                    Log.status == "OK"
+                )
+            ).one()
+            
+            if count >= job.daily_limit:
+                logger.info(f"Job {job_id}: достигнут дневной лимит ({count}/{job.daily_limit})")
+                return
+        except Exception as limit_err:
+            logger.error(f"Ошибка проверки лимита: {limit_err}")
+            # В случае ошибки продолжаем, но логируем её
 
         # Получаем данные
         account = session.get(Account, job.account_id)
@@ -792,17 +802,52 @@ async def execute_job(job_id: int):
 
         if not all([account, folder, template]):
             logger.error(f"Job {job_id}: отсутствуют необходимые данные")
+            job.is_running = False
+            session.add(job)
+            session.commit()
+            return
+
+        # Проверяем сессию аккаунта
+        if not account.session_string:
+            logger.error(f"Job {job_id}: отсутствует строка сессии для аккаунта {account.phone}")
+            job.is_running = False
+            session.add(job)
+            session.commit()
             return
 
         # Получаем или создаем клиента
         if account.id not in active_clients:
             try:
                 active_clients[account.id] = await create_telegram_client(account)
+                # Устанавливаем статус "в сети"
+                try:
+                    from telethon.tl.functions.account import UpdateStatusRequest
+                    await active_clients[account.id](UpdateStatusRequest(offline=False))
+                    logger.info(f"Аккаунт {account.phone} теперь в сети")
+                except Exception as status_err:
+                    logger.warning(f"Не удалось обновить статус: {status_err}")
             except Exception as e:
                 logger.error(f"Не удалось создать клиента для аккаунта {account.id}: {e}")
                 return
-
+        
         client = active_clients[account.id]
+        # Проверяем подключение
+        if not client.is_connected():
+            await client.connect()
+        
+        # Устанавливаем статус "в сети"
+        try:
+            from telethon.tl.functions.account import UpdateStatusRequest
+            await client(UpdateStatusRequest(offline=False))
+            # Дополнительно отправляем UpdatePresenceRequest если доступно
+            try:
+                from telethon.tl.functions.account import UpdateStatusRequest
+                await client(UpdateStatusRequest(offline=False))
+            except:
+                pass
+            logger.info(f"Аккаунт {account.phone} обновлен (online)")
+        except Exception as status_err:
+            logger.warning(f"Не удалось обновить статус: {status_err}")
 
         # Парсим варианты сообщений
         try:
@@ -816,6 +861,9 @@ async def execute_job(job_id: int):
             chats_raw = json.loads(folder.chats_json) if folder.chats_json else []
             if not chats_raw:
                 logger.info(f"Job {job_id}: нет чатов для рассылки")
+                job.is_running = False
+                session.add(job)
+                session.commit()
                 return
 
             # Обрабатываем чаты, разделяя строки с несколькими чатами
@@ -835,6 +883,9 @@ async def execute_job(job_id: int):
 
             if not chats:
                 logger.info(f"Job {job_id}: нет валидных чатов для рассылки")
+                job.is_running = False
+                session.add(job)
+                session.commit()
                 return
 
             # Выбираем случайный чат
@@ -902,6 +953,10 @@ async def execute_job(job_id: int):
 
 async def start_job(job_id: int):
     """Запускает задачу рассылки"""
+    if not scheduler.running:
+        logger.info("Запуск планировщика при старте задачи...")
+        scheduler.start()
+
     with Session(engine) as session:
         job = session.get(Job, job_id)
         if not job:
