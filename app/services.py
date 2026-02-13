@@ -758,24 +758,31 @@ async def execute_job(job_id: int):
         now_dt = datetime.now()
         now_time = now_dt.time()
         
+        # ЛОГИКА ДЛЯ МГНОВЕННОГО ЗАПУСКА:
+        # Если время начала равно времени окончания, считаем что рассылка должна работать всегда
+        if job.active_from == job.active_to:
+            is_active_time = True
         # Если время начала больше времени окончания (например, 22:00 - 08:00)
-        if job.active_from <= job.active_to:
+        elif job.active_from < job.active_to:
             is_active_time = job.active_from <= now_time <= job.active_to
         else:
             is_active_time = now_time >= job.active_from or now_time <= job.active_to
 
         if not is_active_time:
-            logger.info(f"Job {job_id}: вне времени активности ({job.active_from} - {job.active_to})")
-            # Перепланируем проверку через 5 минут
-            scheduler.add_job(
-                execute_job,
-                'date',
-                run_date=now_dt + timedelta(minutes=5),
-                args=[job_id],
-                id=f"job_{job_id}",
-                replace_existing=True
-            )
-            return
+            # ПРОВЕРКА: Если пользователь только что нажал "Запустить" и сейчас время не попадает в интервал,
+            # мы все равно сделаем ПЕРВУЮ отправку, чтобы пользователь видел, что система работает.
+            # Но только если это самый первый запуск (нет логов за сегодня)
+            try:
+                from sqlalchemy import func
+                log_count = session.exec(select(func.count(Log.id)).where(Log.job_id == job.id)).one()
+                if log_count > 0:
+                    logger.info(f"Job {job_id}: вне времени активности ({job.active_from} - {job.active_to})")
+                    scheduler.add_job(execute_job, 'date', run_date=now_dt + timedelta(minutes=5), args=[job_id], id=f"job_{job_id}", replace_existing=True)
+                    return
+                else:
+                    logger.info(f"Job {job_id}: вне времени, но это ПЕРВЫЙ запуск - выполняем тестовую отправку")
+            except:
+                pass
 
         # Проверяем дневной лимит
         try:
@@ -838,13 +845,10 @@ async def execute_job(job_id: int):
         # Устанавливаем статус "в сети"
         try:
             from telethon.tl.functions.account import UpdateStatusRequest
+            # Сначала статус
             await client(UpdateStatusRequest(offline=False))
-            # Дополнительно отправляем UpdatePresenceRequest если доступно
-            try:
-                from telethon.tl.functions.account import UpdateStatusRequest
-                await client(UpdateStatusRequest(offline=False))
-            except:
-                pass
+            # Затем небольшая пауза, чтобы Telegram зафиксировал активность
+            await asyncio.sleep(1)
             logger.info(f"Аккаунт {account.phone} обновлен (online)")
         except Exception as status_err:
             logger.warning(f"Не удалось обновить статус: {status_err}")
@@ -894,9 +898,18 @@ async def execute_job(job_id: int):
 
             # Отправляем сообщение
             try:
+                # ВАЖНО: Принудительно подключаемся, если соединение потеряно
+                if not client.is_connected():
+                    await client.connect()
+                
                 result = await send_message_to_chat(client, chat_id, message, template.media_path)
             except Exception as send_err:
                 logger.error(f"Job {job_id}: ошибка при вызове send_message_to_chat: {send_err}")
+                # Если ошибка сессии - останавливаем задачу
+                if "auth" in str(send_err).lower() or "session" in str(send_err).lower():
+                    job.is_running = False
+                    session.add(job)
+                    session.commit()
                 result = None
 
             # Логируем результат
