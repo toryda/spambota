@@ -679,6 +679,9 @@ async def safe_send(func, *args, **kwargs):
 async def send_message_to_chat(client: TelegramClient, chat_id, message: str, media_path: str = None):
     """Отправляет сообщение в чат"""
     try:
+        # Импортируем типы для премиум эмодзи и форматирования
+        from telethon.tl.types import MessageEntityCustomEmoji
+        
         # Проверяем валидность chat_id
         if not chat_id or str(chat_id).strip() == "":
             logger.error(f"Пустой chat_id: '{chat_id}'")
@@ -688,10 +691,8 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
         if isinstance(chat_id, str):
             chat_id = chat_id.strip()
             if chat_id.startswith('@'):
-                # Username
                 target = chat_id
             else:
-                # ID как строка
                 try:
                     target = int(chat_id)
                 except ValueError:
@@ -706,10 +707,11 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             entity = await client.get_entity(target)
             logger.info(f"Entity получен для {target}: {getattr(entity, 'title', getattr(entity, 'first_name', target))}")
             
+            # Логика отправки с поддержкой Premium эмодзи (через HTML парсинг)
             if media_path and os.path.exists(media_path):
-                result = await safe_send(client.send_file, entity, media_path, caption=message)
+                result = await safe_send(client.send_file, entity, media_path, caption=message, parse_mode='html')
             else:
-                result = await safe_send(client.send_message, entity, message)
+                result = await safe_send(client.send_message, entity, message, parse_mode='html')
             
             if result:
                 logger.info(f"Сообщение успешно отправлено в {target}")
@@ -717,24 +719,25 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             
         except Exception as entity_error:
             error_msg = str(entity_error).lower()
-            if "no user has" in error_msg or "no such peer" in error_msg:
-                logger.error(f"Чат {target} не найден или недоступен: {entity_error}")
-            elif "cannot find any entity" in error_msg:
-                logger.error(f"Не удалось найти чат {target}: {entity_error}")
-            else:
-                logger.warning(f"Не удалось получить entity для {target}: {entity_error}")
             
-            # Пробуем прямую отправку только для ID
-            if not str(target).startswith('@'):
-                try:
-                    if media_path and os.path.exists(media_path):
-                        result = await safe_send(client.send_file, target, media_path, caption=message)
-                    else:
-                        result = await safe_send(client.send_message, target, message)
-                    return result
-                except Exception as direct_error:
-                    logger.error(f"Прямая отправка в {target} также не удалась: {direct_error}")
+            # Если ошибка "You can't write in this chat" или аналогичная
+            if any(msg in error_msg for msg in ["can't write", "forbidden", "banned", "restricted"]):
+                logger.error(f"Доступ ограничен в чате {target}: {entity_error}")
+                # Пытаемся вступить в чат, если это публичная ссылка или username
+                if isinstance(target, str) and (target.startswith('@') or 't.me' in target):
+                    try:
+                        from telethon.tl.functions.channels import JoinChannelRequest
+                        await client(JoinChannelRequest(target))
+                        logger.info(f"Попытка вступления в чат {target} успешна")
+                        # Повторная попытка отправки после вступления
+                        if media_path and os.path.exists(media_path):
+                            return await safe_send(client.send_file, target, media_path, caption=message, parse_mode='html')
+                        else:
+                            return await safe_send(client.send_message, target, message, parse_mode='html')
+                    except Exception as join_err:
+                        logger.error(f"Не удалось вступить в чат {target}: {join_err}")
             
+            logger.warning(f"Ошибка отправки в {target}: {entity_error}")
             return None
             
     except Exception as e:
