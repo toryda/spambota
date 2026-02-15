@@ -707,7 +707,14 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             entity = await client.get_entity(target)
             logger.info(f"Entity получен для {target}: {getattr(entity, 'title', getattr(entity, 'first_name', target))}")
             
-            # Логика отправки с поддержкой Premium эмодзи (через HTML парсинг)
+            # Логика отправки с поддержкой Premium эмодзи
+            # В Telethon для поддержки Premium эмодзи лучше всего использовать парсинг 'html' или 'md'
+            # но иногда требуется явно передавать entities если текст сложный.
+            # Мы будем использовать HTML-парсинг, так как он наиболее надежен для передачи сущностей.
+            
+            # Предварительная обработка сообщения для HTML если нужно
+            # (но мы предполагаем что пользователь вводит текст который может содержать HTML или просто текст)
+            
             if media_path and os.path.exists(media_path):
                 result = await safe_send(client.send_file, entity, media_path, caption=message, parse_mode='html')
             else:
@@ -721,21 +728,34 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             error_msg = str(entity_error).lower()
             
             # Если ошибка "You can't write in this chat" или аналогичная
-            if any(msg in error_msg for msg in ["can't write", "forbidden", "banned", "restricted"]):
+            if any(msg in error_msg for msg in ["can't write", "forbidden", "banned", "restricted", "chat_write_forbidden"]):
                 logger.error(f"Доступ ограничен в чате {target}: {entity_error}")
-                # Пытаемся вступить в чат, если это публичная ссылка или username
-                if isinstance(target, str) and (target.startswith('@') or 't.me' in target):
+                
+                # Пытаемся вступить в чат
+                # 1. Если это username (@channel)
+                # 2. Если это ссылка t.me
+                # 3. Если у нас есть доступ к JoinChannelRequest
+                
+                join_target = None
+                if isinstance(target, str):
+                    if target.startswith('@'):
+                        join_target = target
+                    elif 't.me/' in target:
+                        join_target = target
+                
+                if join_target:
                     try:
                         from telethon.tl.functions.channels import JoinChannelRequest
-                        await client(JoinChannelRequest(target))
-                        logger.info(f"Попытка вступления в чат {target} успешна")
-                        # Повторная попытка отправки после вступления
+                        await client(JoinChannelRequest(join_target))
+                        logger.info(f"Успешно вступили в чат {join_target}, пробуем отправить снова...")
+                        await asyncio.sleep(2) # Небольшая пауза после вступления
+                        
                         if media_path and os.path.exists(media_path):
-                            return await safe_send(client.send_file, target, media_path, caption=message, parse_mode='html')
+                            return await safe_send(client.send_file, entity, media_path, caption=message, parse_mode='html')
                         else:
-                            return await safe_send(client.send_message, target, message, parse_mode='html')
+                            return await safe_send(client.send_message, entity, message, parse_mode='html')
                     except Exception as join_err:
-                        logger.error(f"Не удалось вступить в чат {target}: {join_err}")
+                        logger.error(f"Не удалось вступить в чат {join_target}: {join_err}")
             
             logger.warning(f"Ошибка отправки в {target}: {entity_error}")
             return None
