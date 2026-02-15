@@ -64,7 +64,6 @@ class MessageTemplate(SQLModel, table=True):
     title: str
     variants_json: str                   # JSON-массив с вариантами сообщений
     media_path: Optional[str] = None     # путь к файлу (если есть медиа)
-    message_link: Optional[str] = None   # ссылка на сообщение-донор (для Premium эмодзи)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     jobs: List["Job"] = Relationship(back_populates="template")
