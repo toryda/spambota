@@ -676,7 +676,7 @@ async def safe_send(func, *args, **kwargs):
         return None
 
 
-async def send_message_to_chat(client: TelegramClient, chat_id, message: str, media_path: str = None):
+async def send_message_to_chat(client: TelegramClient, chat_id, message: str, media_path: str = None, message_link: str = None):
     """Отправляет сообщение в чат"""
     try:
         # Импортируем типы для премиум эмодзи и форматирования
@@ -707,17 +707,34 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             entity = await client.get_entity(target)
             logger.info(f"Entity получен для {target}: {getattr(entity, 'title', getattr(entity, 'first_name', target))}")
             
-            # Логика отправки с поддержкой Premium эмодзи
-            # В Telethon для поддержки Premium эмодзи лучше всего использовать парсинг 'html' или 'md'
-            # но иногда требуется явно передавать entities если текст сложный.
-            # Мы будем использовать HTML-парсинг, так как он наиболее надежен для передачи сущностей.
-            
-            # Предварительная обработка сообщения для HTML если нужно
-            # (но мы предполагаем что пользователь вводит текст который может содержать HTML или просто текст)
-            
-            if media_path and os.path.exists(media_path):
+            # Логика отправки
+            if message_link:
+                # Если есть ссылка на сообщение, пытаемся переслать его
+                # Это самый надежный способ сохранить Premium эмодзи
+                try:
+                    # Ссылка формата t.me/channel/123 или t.me/c/123/456
+                    parts = message_link.split('/')
+                    msg_id = int(parts[-1])
+                    peer_id = parts[-2]
+                    
+                    # Если это t.me/c/..., то peer_id это числовой ID
+                    if 't.me/c/' in message_link:
+                        peer_id = int(f"-100{peer_id}")
+                    
+                    donor_entity = await client.get_entity(peer_id)
+                    result = await client.forward_messages(entity, msg_id, donor_entity)
+                except Exception as forward_err:
+                    logger.error(f"Ошибка пересылки по ссылке {message_link}: {forward_err}")
+                    # Если не вышло переслать, пробуем обычную отправку
+                    if media_path and os.path.exists(media_path):
+                        result = await safe_send(client.send_file, entity, media_path, caption=message, parse_mode='html')
+                    else:
+                        result = await safe_send(client.send_message, entity, message, parse_mode='html')
+            elif media_path and os.path.exists(media_path):
+                # Для файлов используем HTML парсинг по умолчанию для поддержки эмодзи
                 result = await safe_send(client.send_file, entity, media_path, caption=message, parse_mode='html')
             else:
+                # Для текста используем HTML парсинг
                 result = await safe_send(client.send_message, entity, message, parse_mode='html')
             
             if result:
@@ -925,7 +942,13 @@ async def execute_job(job_id: int):
                 if not client.is_connected():
                     await client.connect()
                 
-                result = await send_message_to_chat(client, chat_id, message, template.media_path)
+                result = await send_message_to_chat(
+                    client, 
+                    chat_id, 
+                    message, 
+                    template.media_path,
+                    template.message_link
+                )
             except Exception as send_err:
                 logger.error(f"Job {job_id}: ошибка при вызове send_message_to_chat: {send_err}")
                 # Если ошибка сессии - останавливаем задачу
