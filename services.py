@@ -618,6 +618,23 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
             entity = await client.get_entity(target)
             logger.info(f"Entity получен для {target}: {getattr(entity, 'title', getattr(entity, 'first_name', target))}")
             
+            # Проверяем участие (для групп и каналов)
+            from telethon.tl.types import Channel, Chat
+            from telethon.tl.functions.channels import JoinChannelRequest
+            
+            if isinstance(entity, (Channel, Chat)):
+                is_member = True
+                if hasattr(entity, 'left') and entity.left:
+                    is_member = False
+                
+                if not is_member:
+                    try:
+                        logger.info(f"Вступаем в чат {target} перед отправкой")
+                        await client(JoinChannelRequest(entity))
+                        await asyncio.sleep(1)
+                    except Exception as join_err:
+                        logger.warning(f"Не удалось вступить в {target}: {join_err}")
+
             if media_path and os.path.exists(media_path):
                 result = await safe_send(client.send_file, entity, media_path, caption=message)
             else:
