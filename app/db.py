@@ -84,7 +84,6 @@ class Job(SQLModel, table=True):
     active_to: time = time(22, 0, 0)     # конец активности
 
     is_running: bool = False             # активна ли задача
-    current_chat_index: int = 0          # индекс текущего чата для перебора
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     account: Account = Relationship(back_populates="jobs")
