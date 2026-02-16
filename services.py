@@ -706,6 +706,42 @@ async def execute_job(job_id: int):
             logger.error(f"Job {job_id}: отсутствуют необходимые данные")
             return
 
+        # Парсим чаты
+        try:
+            chats_raw = json.loads(folder.chats_json) if folder.chats_json else []
+            if not chats_raw:
+                logger.info(f"Job {job_id}: нет чатов для рассылки")
+                return
+
+            # Обрабатываем чаты, разделяя строки с несколькими чатами
+            chats = []
+            for chat_entry in chats_raw:
+                if isinstance(chat_entry, str):
+                    chat_parts = [part.strip() for part in chat_entry.split() if part.strip()]
+                    chats.extend(chat_parts)
+                else:
+                    chats.append(chat_entry)
+
+            if not chats:
+                logger.info(f"Job {job_id}: нет валидных чатов для рассылки")
+                return
+
+            # Выбираем следующий чат по списку (циклический перебор)
+            if job.current_chat_index >= len(chats):
+                job.current_chat_index = 0
+            
+            chat_id = chats[job.current_chat_index]
+            logger.info(f"Job {job_id}: отправляем сообщение в чат {chat_id} (индекс {job.current_chat_index})")
+            
+            # Обновляем индекс для следующего раза (всегда переключаемся)
+            job.current_chat_index = (job.current_chat_index + 1) % len(chats)
+            session.add(job)
+            session.commit()
+
+        except Exception as e:
+            logger.error(f"Job {job_id}: ошибка парсинга чатов - {e}")
+            return
+
         # Получаем или создаем клиента
         if account.id not in active_clients:
             try:
@@ -723,38 +759,8 @@ async def execute_job(job_id: int):
         except:
             message = template.variants_json
 
-        # Парсим чаты
-        try:
-            chats_raw = json.loads(folder.chats_json) if folder.chats_json else []
-            if not chats_raw:
-                logger.info(f"Job {job_id}: нет чатов для рассылки")
-                return
-
-            # Обрабатываем чаты, разделяя строки с несколькими чатами
-            chats = []
-            for chat_entry in chats_raw:
-                if isinstance(chat_entry, str):
-                    # Разделяем строку по пробелам и фильтруем пустые элементы
-                    chat_parts = [part.strip() for part in chat_entry.split() if part.strip()]
-                    if len(chat_parts) > 1:
-                        # Если в строке несколько чатов, добавляем каждый отдельно
-                        chats.extend(chat_parts)
-                        logger.info(f"Job {job_id}: разделена строка '{chat_entry}' на чаты: {chat_parts}")
-                    else:
-                        chats.append(chat_entry.strip())
-                else:
-                    chats.append(chat_entry)
-
-            if not chats:
-                logger.info(f"Job {job_id}: нет валидных чатов для рассылки")
-                return
-
-            # Выбираем случайный чат
-            chat_id = random.choice(chats)
-            logger.info(f"Job {job_id}: отправляем сообщение в чат {chat_id}")
-
-            # Отправляем сообщение
-            result = await send_message_to_chat(client, chat_id, message, template.media_path)
+        # Отправляем сообщение
+        result = await send_message_to_chat(client, chat_id, message, template.media_path)
 
             # Логируем результат
             if result:
