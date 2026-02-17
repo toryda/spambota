@@ -713,6 +713,7 @@ def delete_message_template(
 async def add_message(
     title: str = Form(...),
     variants_json: str = Form(...),
+    message_link: str = Form(None),
     media_path: str = Form(None),
     media_file: Optional[UploadFile] = File(None),
     session: Session = Depends(get_session),
@@ -729,7 +730,12 @@ async def add_message(
             f.write(content)
         final_media_path = file_path
 
-    tmpl = MessageTemplate(title=title, variants_json=variants_json, media_path=final_media_path)
+    tmpl = MessageTemplate(
+        title=title, 
+        variants_json=variants_json, 
+        message_link=message_link,
+        media_path=final_media_path
+    )
     session.add(tmpl)
     session.commit()
     return RedirectResponse("/messages", status_code=303)

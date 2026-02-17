@@ -63,6 +63,7 @@ class MessageTemplate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str
     variants_json: str                   # JSON-массив с вариантами сообщений
+    message_link: Optional[str] = None   # ссылка на пост для премиум эмодзи
     media_path: Optional[str] = None     # путь к файлу (если есть медиа)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

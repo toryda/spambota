@@ -725,10 +725,22 @@ async def execute_job(job_id: int):
 
         # Проверка на ссылку на сообщение (для премиум эмодзи и т.д.)
         source_msg = None
-        if isinstance(message, str) and 't.me/' in message:
+        
+        # Сначала проверяем новое поле в шаблоне
+        link_to_use = getattr(template, 'message_link', None)
+        
+        # Если в новом поле пусто, проверяем текст варианта (для обратной совместимости)
+        if not link_to_use and isinstance(message, str) and 't.me/' in message:
+            # Простая эвристика: если это только ссылка, используем её
+            clean_text = message.strip()
+            # Проверяем, что в сообщении только ссылка и ничего больше
+            if re.match(r'^https?://t\.me/[\w\d_/]+$', clean_text):
+                link_to_use = clean_text
+
+        if link_to_use:
             try:
                 # Убираем возможные пробелы
-                clean_link = message.strip()
+                clean_link = link_to_use.strip()
                 # Регулярка для извлечения параметров из ссылки
                 # Поддерживает https://t.me/username/123 и https://t.me/c/12345/123
                 msg_match = re.search(r't\.me/(?:c/(\d+)|([\w\d_]+))/(\d+)', clean_link)
@@ -741,8 +753,10 @@ async def execute_job(job_id: int):
                     
                     logger.info(f"Обнаружена ссылка на сообщение: {chat_part}/{msg_id}. Пробуем получить.")
                     source_msg = await client.get_messages(chat_part, ids=msg_id)
+                    if not source_msg:
+                        logger.warning(f"Сообщение по ссылке {link_to_use} не найдено")
             except Exception as e:
-                logger.warning(f"Не удалось получить сообщение по ссылке {message}: {e}")
+                logger.warning(f"Не удалось получить сообщение по ссылке {link_to_use}: {e}")
 
         # Парсим чаты
         try:

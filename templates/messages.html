@@ -32,6 +32,14 @@
         </div>
 
         <div class="form-group">
+            <label class="form-label">Ссылка на сообщение (для премиум эмодзи)</label>
+            <input type="text" name="message_link" class="form-input" placeholder="https://t.me/username/123">
+            <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                Если указана ссылка, бот будет копировать это сообщение (позволяет отправлять премиум эмодзи)
+            </div>
+        </div>
+
+        <div class="form-group">
             <label class="form-label">Медиа файл (необязательно)</label>
             <label class="file-upload">
                 <input type="file" name="media_file" accept="image/*,video/*,.pdf,.doc,.docx" onchange="previewFile(this)">

@@ -75,6 +75,7 @@ class FolderRead(BaseModel):
 class MessageTemplateBase(BaseModel):
     title: str
     variants: List[str] = Field(..., description="Список вариантов сообщений")
+    message_link: Optional[str] = Field(None, description="Ссылка на пост для премиум эмодзи")
     media_path: Optional[str] = Field(None, description="Путь к файлу (опционально)")
 
     @validator("variants")
@@ -110,6 +111,7 @@ class MessageTemplateRead(BaseModel):
             id=tmpl.id,
             title=tmpl.title,
             variants=variants,
+            message_link=getattr(tmpl, 'message_link', None),
             media_path=tmpl.media_path,
             created_at=tmpl.created_at,
         )
