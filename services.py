@@ -723,6 +723,27 @@ async def execute_job(job_id: int):
         except:
             message = template.variants_json
 
+        # Проверка на ссылку на сообщение (для премиум эмодзи и т.д.)
+        source_msg = None
+        if isinstance(message, str) and 't.me/' in message:
+            try:
+                # Убираем возможные пробелы
+                clean_link = message.strip()
+                # Регулярка для извлечения параметров из ссылки
+                # Поддерживает https://t.me/username/123 и https://t.me/c/12345/123
+                msg_match = re.search(r't\.me/(?:c/(\d+)|([\w\d_]+))/(\d+)', clean_link)
+                if msg_match:
+                    chat_part = msg_match.group(1) or msg_match.group(2)
+                    msg_id = int(msg_match.group(3))
+                    
+                    if msg_match.group(1): # Приватный канал (числовой ID)
+                        chat_part = int(f"-100{chat_part}")
+                    
+                    logger.info(f"Обнаружена ссылка на сообщение: {chat_part}/{msg_id}. Пробуем получить.")
+                    source_msg = await client.get_messages(chat_part, ids=msg_id)
+            except Exception as e:
+                logger.warning(f"Не удалось получить сообщение по ссылке {message}: {e}")
+
         # Парсим чаты
         try:
             chats_raw = json.loads(folder.chats_json) if folder.chats_json else []
@@ -766,7 +787,11 @@ async def execute_job(job_id: int):
             session.commit()
 
             # Отправляем сообщение
-            result = await send_message_to_chat(client, chat_id, message, template.media_path)
+            if source_msg:
+                # Если это ссылка на сообщение, используем send_message с объектом Message (копирование)
+                result = await safe_send(client.send_message, chat_id, source_msg)
+            else:
+                result = await send_message_to_chat(client, chat_id, message, template.media_path)
 
             # Логируем результат
             if result:
