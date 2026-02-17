@@ -749,9 +749,21 @@ async def execute_job(job_id: int):
                 logger.info(f"Job {job_id}: нет валидных чатов для рассылки")
                 return
 
-            # Выбираем случайный чат
-            chat_id = random.choice(chats)
-            logger.info(f"Job {job_id}: отправляем сообщение в чат {chat_id}")
+            # Выбираем следующий чат по списку (циклический перебор)
+            current_index = getattr(job, 'current_chat_index', 0)
+            if current_index is None:
+                current_index = 0
+                
+            if current_index >= len(chats):
+                current_index = 0
+            
+            chat_id = chats[current_index]
+            logger.info(f"Job {job_id}: отправляем сообщение в чат {chat_id} (индекс {current_index})")
+            
+            # Обновляем индекс для следующего раза (всегда переключаемся)
+            job.current_chat_index = (current_index + 1) % len(chats)
+            session.add(job)
+            session.commit()
 
             # Отправляем сообщение
             result = await send_message_to_chat(client, chat_id, message, template.media_path)
