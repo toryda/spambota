@@ -806,13 +806,18 @@ async def execute_job(job_id: int):
             result = await safe_send(client.send_message, chat_id, source_msg)
         else:
             # Проверяем на наличие разметки в тексте для изменения шрифта
-            parse_mode = 'html'
+            # По умолчанию используем 'html', так как Telethon хорошо справляется с ним
+            # Если в сообщении есть спецсимволы Markdown, Telethon тоже их поймет,
+            # но явное указание помогает избежать неоднозначности.
+            
+            parse_mode = 'html' # По умолчанию HTML
             if isinstance(message, str):
-                # Поддерживаем Markdown и HTML автоматически
-                if '<b>' in message or '<i>' in message or '<code>' in message or '<pre>' in message:
-                    parse_mode = 'html'
-                elif '**' in message or '__' in message or '`' in message:
-                    parse_mode = 'markdown'
+                # Если нет HTML тегов, но есть Markdown символы, переключаемся на md
+                has_html = any(tag in message for tag in ['<b>', '<i>', '<code>', '<s>', '<u>', '<pre>', '<a>'])
+                has_md = any(sym in message for sym in ['**', '__', '`', '~~'])
+                
+                if has_md and not has_html:
+                    parse_mode = 'md'
                 
             result = await send_message_to_chat(client, chat_id, message, template.media_path, parse_mode=parse_mode)
 
