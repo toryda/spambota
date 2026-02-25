@@ -588,7 +588,7 @@ async def safe_send(func, *args, **kwargs):
         return None
 
 
-async def send_message_to_chat(client: TelegramClient, chat_id, message: str, media_path: str = None):
+async def send_message_to_chat(client: TelegramClient, chat_id, message: str, media_path: str = None, parse_mode: str = 'html'):
     """Отправляет сообщение в чат"""
     try:
         # Проверяем валидность chat_id
@@ -636,9 +636,9 @@ async def send_message_to_chat(client: TelegramClient, chat_id, message: str, me
                         logger.warning(f"Не удалось вступить в {target}: {join_err}")
 
             if media_path and os.path.exists(media_path):
-                result = await safe_send(client.send_file, entity, media_path, caption=message)
+                result = await safe_send(client.send_file, entity, media_path, caption=message, parse_mode=parse_mode)
             else:
-                result = await safe_send(client.send_message, entity, message)
+                result = await safe_send(client.send_message, entity, message, parse_mode=parse_mode)
             
             if result:
                 logger.info(f"Сообщение успешно отправлено в {target}")
@@ -800,12 +800,21 @@ async def execute_job(job_id: int):
             session.add(job)
             session.commit()
 
-            # Отправляем сообщение
-            if source_msg:
-                # Если это ссылка на сообщение, используем send_message с объектом Message (копирование)
-                result = await safe_send(client.send_message, chat_id, source_msg)
-            else:
-                result = await send_message_to_chat(client, chat_id, message, template.media_path)
+        # Отправляем сообщение
+        if source_msg:
+            # Если это ссылка на сообщение, используем send_message с объектом Message (копирование)
+            result = await safe_send(client.send_message, chat_id, source_msg)
+        else:
+            # Проверяем на наличие разметки в тексте для изменения шрифта
+            parse_mode = 'html'
+            if isinstance(message, str):
+                # Поддерживаем Markdown и HTML автоматически
+                if '<b>' in message or '<i>' in message or '<code>' in message or '<pre>' in message:
+                    parse_mode = 'html'
+                elif '**' in message or '__' in message or '`' in message:
+                    parse_mode = 'markdown'
+                
+            result = await send_message_to_chat(client, chat_id, message, template.media_path, parse_mode=parse_mode)
 
             # Логируем результат
             if result:
