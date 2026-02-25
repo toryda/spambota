@@ -807,14 +807,12 @@ async def execute_job(job_id: int):
         else:
             # Проверяем на наличие разметки в тексте для изменения шрифта
             # По умолчанию используем 'html', так как Telethon хорошо справляется с ним
-            # Если в сообщении есть спецсимволы Markdown, Telethon тоже их поймет,
-            # но явное указание помогает избежать неоднозначности.
-            
-            parse_mode = 'html' # По умолчанию HTML
+            parse_mode = 'html'
             if isinstance(message, str):
-                # Если нет HTML тегов, но есть Markdown символы, переключаемся на md
-                has_html = any(tag in message for tag in ['<b>', '<i>', '<code>', '<s>', '<u>', '<pre>', '<a>'])
-                has_md = any(sym in message for sym in ['**', '__', '`', '~~'])
+                # Простейшая проверка: если есть **, __ или `, переключаемся на md
+                # Но только если нет явных HTML тегов
+                has_html = '<' in message and '>' in message
+                has_md = '**' in message or '__' in message or '`' in message
                 
                 if has_md and not has_html:
                     parse_mode = 'md'
